@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable for API key
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 export default async function handler(req, res) {
   console.log('Image generation API route called:', req.method, req.url);
