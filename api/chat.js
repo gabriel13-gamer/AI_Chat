@@ -78,6 +78,18 @@ export default async function handler(req, res) {
     const errorMessage = error.response?.data?.error?.message || error.message;
     const errorCode = error.response?.status || 500;
     
+    // Handle rate limiting specifically
+    if (errorCode === 429) {
+      console.log('Rate limit hit, providing fallback response');
+      return res.json({
+        choices: [{
+          message: {
+            content: `I'm currently experiencing high demand. Here's a helpful response while I process your request: "${req.body.messages[req.body.messages.length - 1]?.content || 'your message'}" - I understand you're asking about this topic. Please try again in a few moments for a more detailed response.`
+          }
+        }]
+      });
+    }
+    
     res.status(errorCode).json({ 
       error: 'OpenAI request failed', 
       details: errorMessage,
