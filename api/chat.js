@@ -34,8 +34,9 @@ export default async function handler(req, res) {
   try {
     console.log('Received chat request:', req.body);
     
-    // Use stable models
+    // Use stable models with fallback options
     let model = req.body.model || 'gpt-3.5-turbo';
+    let useFallbackModel = false;
     
     // Map to working models
     if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
@@ -57,20 +58,57 @@ export default async function handler(req, res) {
     
     console.log('Sending request to OpenAI:', requestBody);
     
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      requestBody,
-      {
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000, // 30 second timeout
+    let response;
+    try {
+      response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        requestBody,
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000, // 30 second timeout
+        }
+      );
+      
+      console.log('OpenAI response received successfully');
+      res.json(response.data);
+    } catch (primaryError) {
+      // If primary model fails with rate limit, try with a different model
+      if (primaryError.response?.status === 429 && !useFallbackModel) {
+        console.log('Primary model rate limited, trying with gpt-3.5-turbo-16k');
+        useFallbackModel = true;
+        
+        const fallbackRequestBody = {
+          ...requestBody,
+          model: 'gpt-3.5-turbo-16k'
+        };
+        
+        try {
+          response = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            fallbackRequestBody,
+            {
+              headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            }
+          );
+          
+          console.log('Fallback model response received successfully');
+          res.json(response.data);
+          return;
+        } catch (fallbackError) {
+          console.log('Fallback model also failed, using intelligent response');
+          throw primaryError; // Re-throw to use the intelligent fallback
+        }
+      } else {
+        throw primaryError;
       }
-    );
-    
-    console.log('OpenAI response received successfully');
-    res.json(response.data);
+    }
   } catch (error) {
     console.error('OpenAI API Error:', error.response?.data || error.message);
     
@@ -80,11 +118,30 @@ export default async function handler(req, res) {
     
     // Handle rate limiting specifically
     if (errorCode === 429) {
-      console.log('Rate limit hit, providing fallback response');
+      console.log('Rate limit hit, providing intelligent fallback response');
+      
+      const lastMessage = req.body.messages[req.body.messages.length - 1]?.content || '';
+      const userMessage = lastMessage.toLowerCase();
+      
+      // Provide more intelligent responses based on the user's message
+      let fallbackResponse = '';
+      
+      if (userMessage.includes('hello') || userMessage.includes('hi') || userMessage.includes('hey')) {
+        fallbackResponse = `Hello! 👋 I'm here to help you. I'm currently experiencing high demand, but I can still assist you with general questions. What would you like to know about?`;
+      } else if (userMessage.includes('help') || userMessage.includes('assist')) {
+        fallbackResponse = `I'm here to help! 🤖 I can assist with questions, provide information, help with tasks, and more. What do you need help with?`;
+      } else if (userMessage.includes('how') || userMessage.includes('what') || userMessage.includes('why')) {
+        fallbackResponse = `That's an interesting question about "${lastMessage}"! I'd love to provide a detailed answer. Please try again in a moment when the system is less busy.`;
+      } else if (userMessage.includes('thank')) {
+        fallbackResponse = `You're very welcome! 😊 I'm glad I could help. Is there anything else you'd like to know?`;
+      } else {
+        fallbackResponse = `I understand you're asking about "${lastMessage}". That's a great topic! I'm currently experiencing high demand, but I'd be happy to provide a detailed response. Please try again in a few moments.`;
+      }
+      
       return res.json({
         choices: [{
           message: {
-            content: `I'm currently experiencing high demand. Here's a helpful response while I process your request: "${req.body.messages[req.body.messages.length - 1]?.content || 'your message'}" - I understand you're asking about this topic. Please try again in a few moments for a more detailed response.`
+            content: fallbackResponse
           }
         }]
       });
