@@ -32,18 +32,27 @@ export async function sendMessage(messages, username = 'User') {
     }
   } catch (error) {
     console.error('OpenAI API Error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url
+    })
     
     // Better error handling with fallback responses
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-      return `Hi ${username}! I'm having trouble connecting to the AI service right now. Please make sure the API server is running on port 3001. You can start it with: node server.cjs`
+      return `Hi ${username}! I'm having trouble connecting to the AI service right now. The API endpoint might not be available.`
     } else if (error.response?.status === 401) {
       return `Hi ${username}! There's an authentication issue with the AI service. Please check the API key configuration.`
     } else if (error.response?.status === 429) {
       return `Hi ${username}! The AI service is currently rate-limited. Please try again in a moment.`
     } else if (error.response?.status >= 500) {
       return `Hi ${username}! The AI service is experiencing server issues. Please try again later.`
+    } else if (error.response?.status === 404) {
+      return `Hi ${username}! The AI service endpoint was not found. This might be a deployment issue.`
     } else {
-      return `Hi ${username}! I'm having trouble processing your request right now. Please try again or check if the server is running.`
+      return `Hi ${username}! I'm having trouble processing your request right now. Error: ${error.message}`
     }
   }
 } 
