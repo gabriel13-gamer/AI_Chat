@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const OPENAI_API_URL = 'http://localhost:3001/api/chat'
+const OPENAI_API_URL = '/api/chat'
 
 export async function sendMessage(messages, username = 'User') {
   try {

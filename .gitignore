@@ -49,3 +49,4 @@ temp/
 
 # AI Chat Mobile (embedded git repository)
 AI-Chat-Mobile/
+.vercel
