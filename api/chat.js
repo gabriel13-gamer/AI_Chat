@@ -35,15 +35,15 @@ export default async function handler(req, res) {
     console.log('Received chat request:', req.body);
     
     // Use stable models
-    let model = req.body.model || 'gpt-4o-mini';
+    let model = req.body.model || 'gpt-3.5-turbo';
     
     // Map to working models
-    if (model === 'gpt-4o') {
-      model = 'gpt-4o-mini'; // Use mini for better reliability
+    if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
+      model = 'gpt-3.5-turbo'; // Use 3.5 for better reliability
     } else if (model === 'gpt-4.1' || model === 'gpt-4.1-mini') {
-      model = 'gpt-4o-mini'; // Fallback to working model
+      model = 'gpt-3.5-turbo'; // Fallback to working model
     } else if (model === 'o1-preview' || model === 'o1-mini') {
-      model = 'gpt-4o-mini'; // Fallback to working model
+      model = 'gpt-3.5-turbo'; // Fallback to working model
     }
     
     const messages = req.body.messages || [];

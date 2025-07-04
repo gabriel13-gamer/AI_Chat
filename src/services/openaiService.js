@@ -15,7 +15,7 @@ export async function sendMessage(messages, username = 'User') {
     const response = await axios.post(
       OPENAI_API_URL,
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         messages: messagesWithSystem,
         temperature: 0.7,
         max_tokens: 1024,
