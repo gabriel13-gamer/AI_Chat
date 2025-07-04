@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight requests
@@ -34,17 +34,16 @@ export default async function handler(req, res) {
   try {
     console.log('Received chat request:', req.body);
     
-    // Use stable models with fallback options
-    let model = req.body.model || 'gpt-3.5-turbo';
-    let useFallbackModel = false;
+    // Use stable models
+    let model = req.body.model || 'gpt-4o-mini';
     
     // Map to working models
-    if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
-      model = 'gpt-3.5-turbo'; // Use 3.5 for better reliability
+    if (model === 'gpt-4o') {
+      model = 'gpt-4o-mini'; // Use mini for better reliability
     } else if (model === 'gpt-4.1' || model === 'gpt-4.1-mini') {
-      model = 'gpt-3.5-turbo'; // Fallback to working model
+      model = 'gpt-4o-mini'; // Fallback to working model
     } else if (model === 'o1-preview' || model === 'o1-mini') {
-      model = 'gpt-3.5-turbo'; // Fallback to working model
+      model = 'gpt-4o-mini'; // Fallback to working model
     }
     
     const messages = req.body.messages || [];
@@ -58,57 +57,20 @@ export default async function handler(req, res) {
     
     console.log('Sending request to OpenAI:', requestBody);
     
-    let response;
-    try {
-      response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000, // 30 second timeout
-        }
-      );
-      
-      console.log('OpenAI response received successfully');
-      res.json(response.data);
-    } catch (primaryError) {
-      // If primary model fails with rate limit, try with a different model
-      if (primaryError.response?.status === 429 && !useFallbackModel) {
-        console.log('Primary model rate limited, trying with gpt-3.5-turbo-16k');
-        useFallbackModel = true;
-        
-        const fallbackRequestBody = {
-          ...requestBody,
-          model: 'gpt-3.5-turbo-16k'
-        };
-        
-        try {
-          response = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
-            fallbackRequestBody,
-            {
-              headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              timeout: 30000,
-            }
-          );
-          
-          console.log('Fallback model response received successfully');
-          res.json(response.data);
-          return;
-        } catch (fallbackError) {
-          console.log('Fallback model also failed, using intelligent response');
-          throw primaryError; // Re-throw to use the intelligent fallback
-        }
-      } else {
-        throw primaryError;
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      requestBody,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000, // 30 second timeout
       }
-    }
+    );
+    
+    console.log('OpenAI response received successfully');
+    res.json(response.data);
   } catch (error) {
     console.error('OpenAI API Error:', error.response?.data || error.message);
     

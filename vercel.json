@@ -2,19 +2,12 @@
   "functions": {
     "api/chat.js": {
       "maxDuration": 30
-    },
-    "api/generate-image.js": {
-      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/api/chat",
       "destination": "/api/chat.js"
-    },
-    {
-      "source": "/api/generate-image",
-      "destination": "/api/generate-image.js"
     }
   ]
 } 
