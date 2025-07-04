@@ -23,6 +23,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!OPENAI_API_KEY) {
+    console.error('OpenAI API key not configured');
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  console.log('API key configured:', OPENAI_API_KEY ? 'Yes' : 'No');
+  console.log('API key length:', OPENAI_API_KEY ? OPENAI_API_KEY.length : 0);
+
   try {
     console.log('Received chat request:', req.body);
     
