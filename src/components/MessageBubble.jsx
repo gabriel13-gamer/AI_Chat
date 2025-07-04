@@ -18,78 +18,82 @@ const MessageBubble = ({ message, onCopy, onDownload, copied, features }) => {
           )}
           
           <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">
+                {isUser ? (message.userName || 'You') : 'AI Assistant'}
+              </span>
+              <span className="text-xs text-chat-muted">
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+
+            {/* File attachment */}
             {message.file && (
-              <div className="mb-3 p-3 bg-chat-bg rounded border border-chat-border">
-                <div className="flex items-center space-x-2 mb-2">
+              <div className="mb-3 p-3 bg-chat-surface border border-chat-border rounded-lg">
+                <div className="flex items-center space-x-2">
                   <Paperclip className="w-4 h-4 text-chat-muted" />
                   <span className="text-sm font-medium">{message.file.name}</span>
                 </div>
                 {message.file.preview && (
-                  <img 
-                    src={message.file.preview} 
-                    alt={message.file.name}
-                    className="max-w-full h-auto rounded"
-                  />
+                  <div className="mt-2 text-xs text-chat-muted">
+                    {message.file.preview}
+                  </div>
                 )}
               </div>
             )}
-            
-            <div className="prose prose-invert max-w-none">
-              {features.markdownRendering ? (
-                <ReactMarkdown
-                  components={{
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || '')
-                      return !inline && match ? (
-                        <SyntaxHighlighter
-                          style={tomorrow}
-                          language={match[1]}
-                          PreTag="div"
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
-                      ) : (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      )
-                    }
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-              ) : (
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              )}
+
+            {/* Message content */}
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '')
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        style={tomorrow}
+                        language={match[1]}
+                        PreTag="div"
+                        {...props}
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    )
+                  }
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
-            
-            <div className="flex items-center justify-between mt-2 text-xs text-chat-muted">
-              <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => onCopy(message.content, message.id)}
-                  className="p-1 hover:text-chat-text transition-colors"
-                  title="Copy message"
-                >
-                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                </button>
+
+            {/* Action buttons */}
+            <div className="flex items-center space-x-2 mt-3">
+              <button
+                onClick={() => onCopy(message.content, message.id)}
+                className="p-1 text-chat-muted hover:text-chat-text transition-colors"
+                title="Copy message"
+              >
+                {copied === message.id ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+              
+              {features?.downloadMessages && (
                 <button
                   onClick={() => onDownload(message.content, `message-${message.id}.txt`)}
-                  className="p-1 hover:text-chat-text transition-colors"
+                  className="p-1 text-chat-muted hover:text-chat-text transition-colors"
                   title="Download message"
                 >
-                  <Download className="w-3 h-3" />
+                  <Download className="w-4 h-4" />
                 </button>
-              </div>
+              )}
             </div>
           </div>
-          
-          {isUser && (
-            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
-              <User className="w-4 h-4 text-white" />
-            </div>
-          )}
         </div>
       </div>
     </div>

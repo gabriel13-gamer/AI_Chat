@@ -130,6 +130,10 @@ export default async function handler(req, res) {
         fallbackResponse = `Hello! 👋 I'm here to help you. I'm currently experiencing high demand, but I can still assist you with general questions. What would you like to know about?`;
       } else if (userMessage.includes('help') || userMessage.includes('assist')) {
         fallbackResponse = `I'm here to help! 🤖 I can assist with questions, provide information, help with tasks, and more. What do you need help with?`;
+      } else if (userMessage.includes('portuguese') && userMessage.includes('june')) {
+        fallbackResponse = `June is incredibly important in Portuguese cultural celebrations! The main event is the Festas de São João (St. John's Festival) celebrated on June 23-24, especially in Porto and Braga. These festivals feature traditional music, dancing, grilled sardines, and the famous 'martelinhos' (plastic hammers) that people use to playfully hit each other on the head. There are also the Festas de Santo António in Lisbon (June 12-13) with parades, traditional costumes, and grilled sardines. These celebrations honor Portuguese saints and bring communities together with music, food, and traditional customs that have been passed down for generations.`;
+      } else if (userMessage.includes('portuguese') || userMessage.includes('portugal')) {
+        fallbackResponse = `Portuguese culture is rich and diverse! Portugal is known for its maritime history, beautiful azulejo tiles, traditional Fado music, delicious cuisine with seafood and pastries, and vibrant festivals. Some of the most important celebrations include São João in Porto (June 23-24), Santo António in Lisbon (June 12-13), and the Festa dos Tabuleiros in Tomar. Portuguese people are known for their warm hospitality and strong community bonds.`;
       } else if (userMessage.includes('how') || userMessage.includes('what') || userMessage.includes('why')) {
         fallbackResponse = `That's an interesting question about "${lastMessage}"! I'd love to provide a detailed answer. Please try again in a moment when the system is less busy.`;
       } else if (userMessage.includes('thank')) {

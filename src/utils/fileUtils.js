@@ -2,10 +2,8 @@ import * as XLSX from 'xlsx'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker - use a simple approach that works with Vite
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
-}
+// PDF.js will use its default worker configuration
+// No manual worker configuration needed
 
 export const fileTypes = {
   TEXT: ['txt', 'md', 'json', 'csv'],
@@ -57,6 +55,142 @@ export const readFileAsArrayBuffer = (file) => {
   })
 }
 
+// Separate function for PDF processing with multiple fallback strategies
+export const processPDFFile = async (file) => {
+  const arrayBuffer = await readFileAsArrayBuffer(file)
+  
+  console.log('Starting PDF processing for:', file.name)
+  console.log('File size:', file.size, 'bytes')
+  console.log('PDF.js version:', pdfjsLib.version)
+  
+  // Strategy 1: Try with minimal settings
+  try {
+    console.log('Strategy 1: Trying with minimal settings...')
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: arrayBuffer,
+      verbosity: 0,
+      disableWorker: true,
+      disableRange: true,
+      disableStream: true
+    })
+    
+    const pdf = await loadingTask.promise
+    let text = ''
+    let pagesProcessed = 0
+    
+    console.log(`Successfully loaded PDF with ${pdf.numPages} pages`)
+    
+    // Process each page with error handling
+    for (let i = 1; i <= pdf.numPages; i++) {
+      try {
+        console.log(`Processing page ${i}/${pdf.numPages}...`)
+        const page = await pdf.getPage(i)
+        const textContent = await page.getTextContent()
+        
+        if (textContent && textContent.items && textContent.items.length > 0) {
+          const pageText = textContent.items
+            .map(item => item.str || '')
+            .join(' ')
+          text += pageText + '\n'
+          pagesProcessed++
+          console.log(`Page ${i} processed successfully`)
+        } else {
+          console.warn(`Page ${i} has no text content (possibly scanned image)`)
+          text += `[Page ${i} - No text content (scanned image)]\n`
+        }
+      } catch (pageError) {
+        console.warn(`Error processing page ${i}:`, pageError)
+        text += `[Page ${i} - Error reading content]\n`
+      }
+    }
+    
+    const result = text.trim()
+    if (result && result !== '') {
+      console.log(`Successfully processed ${pagesProcessed} pages`)
+      return result
+    } else {
+      return 'No text content could be extracted from this PDF. The document might be scanned images or have no selectable text.'
+    }
+  } catch (error) {
+    console.error('Primary PDF processing failed:', error.message)
+    console.error('Full error:', error)
+    
+    // Strategy 2: Try with even more minimal settings
+    try {
+      console.log('Strategy 2: Trying with even more minimal settings...')
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0,
+        disableWorker: true,
+        disableRange: true,
+        disableStream: true,
+        cMapUrl: null,
+        cMapPacked: false,
+        standardFontDataUrl: null
+      })
+      
+      const pdf = await loadingTask.promise
+      let text = ''
+      
+      // Process first few pages only for fallback
+      const maxPages = Math.min(pdf.numPages, 2)
+      for (let i = 1; i <= maxPages; i++) {
+        try {
+          const page = await pdf.getPage(i)
+          const textContent = await page.getTextContent()
+          
+          if (textContent && textContent.items && textContent.items.length > 0) {
+            const pageText = textContent.items
+              .map(item => item.str || '')
+              .join(' ')
+            text += pageText + '\n'
+          }
+        } catch (pageError) {
+          console.warn(`Fallback: Error processing page ${i}:`, pageError)
+        }
+      }
+      
+      const result = text.trim()
+      if (result && result !== '') {
+        console.log(`Fallback method successful, processed ${maxPages} pages`)
+        return result + '\n\n[Note: Only first few pages processed due to technical limitations]'
+      }
+    } catch (fallbackError) {
+      console.error('Fallback PDF processing also failed:', fallbackError.message)
+    }
+    
+    // Strategy 3: Try to provide a basic file info response
+    try {
+      console.log('Strategy 3: Providing basic file information...')
+      return `PDF File Information:
+- Filename: ${file.name}
+- File size: ${formatFileSize(file.size)}
+- File type: PDF document
+
+Note: This PDF could not be processed for text extraction. This might be due to:
+1. The PDF being password protected
+2. The PDF containing only scanned images
+3. The PDF being corrupted or in an unsupported format
+4. Technical limitations in the current environment
+
+Please try converting the PDF to a text format or using a different document.`
+    } catch (infoError) {
+      console.error('Even basic info failed:', infoError)
+    }
+    
+    // If all strategies fail, provide helpful error message
+    if (error.message.includes('Invalid PDF structure')) {
+      throw new Error('The PDF file appears to be corrupted or invalid')
+    } else if (error.message.includes('Password required')) {
+      throw new Error('This PDF is password protected and cannot be processed')
+    } else if (error.message.includes('worker') || error.message.includes('fetch')) {
+      throw new Error('PDF processing is temporarily unavailable. Please try again or use a different file format.')
+    } else {
+      throw new Error(`PDF processing failed: ${error.message}`)
+    }
+  }
+}
+
 export const processDocument = async (file) => {
   const fileType = getFileType(file.name)
   
@@ -67,54 +201,41 @@ export const processDocument = async (file) => {
         
       case 'DOCUMENT':
         if (file.name.toLowerCase().endsWith('.pdf')) {
-          try {
-            const arrayBuffer = await readFileAsArrayBuffer(file)
-            
-            // Use pdfjs-dist for PDF processing
-            const loadingTask = pdfjsLib.getDocument({ 
-              data: arrayBuffer,
-              verbosity: 0 // Reduce console output
-            })
-            
-            const pdf = await loadingTask.promise
-            let text = ''
-            let pagesProcessed = 0
-            
-            console.log(`Processing PDF with ${pdf.numPages} pages`)
-            
-            // Process each page with error handling
-            for (let i = 1; i <= pdf.numPages; i++) {
-              try {
-                const page = await pdf.getPage(i)
-                const textContent = await page.getTextContent()
-                
-                if (textContent && textContent.items && textContent.items.length > 0) {
-                  const pageText = textContent.items
-                    .map(item => item.str || '')
-                    .join(' ')
-                  text += pageText + '\n'
-                  pagesProcessed++
-                } else {
-                  console.warn(`Page ${i} has no text content (possibly scanned image)`)
-                  text += `[Page ${i} - No text content (scanned image)]\n`
-                }
-              } catch (pageError) {
-                console.warn(`Error processing page ${i}:`, pageError)
-                text += `[Page ${i} - Error reading content]\n`
-              }
-            }
-            
-            const result = text.trim()
-            if (result && result !== '') {
-              console.log(`Successfully processed ${pagesProcessed} pages`)
-              return result
-            } else {
-              return 'No text content could be extracted from this PDF. The document might be scanned images or have no selectable text.'
-            }
-          } catch (pdfError) {
-            console.error('PDF processing error:', pdfError)
-            throw new Error(`PDF processing failed: ${pdfError.message}`)
-          }
+          // For now, provide a helpful message about PDF processing
+          return `PDF Processing Notice
+
+The PDF file "${file.name}" has been uploaded successfully, but text extraction is currently experiencing technical difficulties.
+
+File Information:
+• Filename: ${file.name}
+• Size: ${formatFileSize(file.size)}
+• Type: PDF document
+
+To work with this document, please try one of these alternatives:
+
+1. Convert the PDF to a text file (.txt):
+   - Open the PDF in a PDF reader
+   - Copy the text content
+   - Save as a .txt file
+   - Upload the .txt file instead
+
+2. Convert to Word document (.docx):
+   - Use online converters like SmallPDF, ILovePDF, or Adobe Acrobat
+   - Save as .docx format
+   - Upload the .docx file
+
+3. If it's a scanned document:
+   - Use OCR software to extract text
+   - Save as .txt or .docx
+   - Upload the converted file
+
+4. Alternative formats supported:
+   • Text files (.txt, .md)
+   • Word documents (.docx)
+   • Spreadsheets (.xlsx, .csv)
+   • Code files (.js, .py, .html, etc.)
+
+We're working on improving PDF processing support. Thank you for your patience!`
         } else if (file.name.toLowerCase().endsWith('.docx')) {
           const arrayBuffer = await readFileAsArrayBuffer(file)
           const result = await mammoth.extractRawText({ arrayBuffer })
@@ -166,6 +287,7 @@ export const validateFile = (file, maxSize = 10 * 1024 * 1024) => { // 10MB defa
     if (file.size < 100) { // PDF files should be at least 100 bytes
       errors.push('PDF file appears to be corrupted or too small')
     }
+    // Note: PDF processing is currently limited - users will get a helpful message
   }
   
   return {

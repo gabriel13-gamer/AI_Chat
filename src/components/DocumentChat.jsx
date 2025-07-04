@@ -75,13 +75,33 @@ const DocumentChat = () => {
     setIsProcessing(true)
 
     try {
-      const prompt = `Based on the following document content, please answer this question: "${question}"
+      let prompt
+      
+      if (selectedDocument.name.toLowerCase().endsWith('.pdf')) {
+        // Special handling for PDF documents
+        prompt = `I have a PDF document called "${selectedDocument.name}" (${formatFileSize(selectedDocument.size)}) that I uploaded, but I couldn't extract the text content due to technical limitations.
+
+The user is asking: "${question}"
+
+Please help them with this question. If they're asking about the content of the PDF, explain that you can't see the actual content but can help them with:
+1. Converting the PDF to other formats
+2. General PDF-related questions
+3. Alternative ways to work with the document
+4. Technical support for PDF processing
+
+If they're asking about the document itself (file size, format, etc.), you can answer based on the file information provided.
+
+Please be helpful and provide practical solutions.`
+      } else {
+        // Normal document processing
+        prompt = `Based on the following document content, please answer this question: "${question}"
 
 Document: ${selectedDocument.name}
 Content:
 ${selectedDocument.content}
 
 Please provide a comprehensive answer based on the document content.`
+      }
 
       const aiResponse = await sendOpenAIMessage([
         { role: 'user', content: prompt }
@@ -252,9 +272,62 @@ Please provide a comprehensive answer based on the document content.`
                 )}
                 
                 <div className="max-h-96 overflow-y-auto">
-                  <pre className="text-sm text-chat-text whitespace-pre-wrap bg-chat-bg p-3 rounded border border-chat-border">
-                    {selectedDocument.content}
-                  </pre>
+                  {selectedDocument.name.toLowerCase().endsWith('.pdf') ? (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="text-blue-600 dark:text-blue-400">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                            PDF Document: {selectedDocument.name}
+                          </h3>
+                          <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                            This PDF has been uploaded successfully. While text extraction is currently limited, 
+                            you can still ask questions about the document and I'll help you work with it.
+                          </p>
+                          <div className="space-y-2 text-sm text-blue-600 dark:text-blue-400">
+                            <p><strong>File Details:</strong></p>
+                            <ul className="list-disc list-inside space-y-1 ml-2">
+                              <li>Size: {formatFileSize(selectedDocument.size)}</li>
+                              <li>Type: PDF document</li>
+                              <li>Uploaded: {new Date(selectedDocument.uploadedAt).toLocaleDateString()}</li>
+                            </ul>
+                          </div>
+                          
+                          <div className="mt-4 pt-3 border-t border-blue-200 dark:border-blue-700">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                              Quick Actions:
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => setQuestion("How can I convert this PDF to text?")}
+                                className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                              >
+                                Convert to Text
+                              </button>
+                              <button
+                                onClick={() => setQuestion("What are the best tools to extract text from this PDF?")}
+                                className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                              >
+                                Text Extraction Tools
+                              </button>
+                              <button
+                                onClick={() => setQuestion("Can you help me work with this PDF document?")}
+                                className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                              >
+                                Get Help
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <pre className="text-sm text-chat-text whitespace-pre-wrap bg-chat-bg p-3 rounded border border-chat-border">
+                      {selectedDocument.content}
+                    </pre>
+                  )}
                 </div>
               </div>
             ) : (
@@ -291,7 +364,11 @@ Please provide a comprehensive answer based on the document content.`
                   <textarea
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Ask a question about this document..."
+                    placeholder={
+                      selectedDocument.name.toLowerCase().endsWith('.pdf') 
+                        ? "Ask about this PDF document, request help with conversion, or ask general questions..."
+                        : "Ask a question about this document..."
+                    }
                     className="chat-input w-full resize-none"
                     rows={3}
                   />

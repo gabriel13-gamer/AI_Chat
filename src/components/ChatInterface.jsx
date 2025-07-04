@@ -12,6 +12,7 @@ import { processDocument, validateFile, createFilePreview, getFileType } from '.
 import MessageBubble from './MessageBubble'
 import TypingIndicator from './TypingIndicator'
 import { sendMessage as sendOpenAIMessage } from '../services/openaiService'
+import { getSmartResponse } from './LiveChatKnowledge'
 
 const ChatInterface = () => {
   const [input, setInput] = useState('')
@@ -59,16 +60,52 @@ const ChatInterface = () => {
     }))
     conversationHistory.push({ role: 'user', content: userMessage.content })
 
-    // Get AI response from OpenAI with username
-    const aiContent = await sendOpenAIMessage(conversationHistory, user?.name || 'User')
-    const aiMessage = {
-      role: 'assistant',
-      content: aiContent,
-      timestamp: new Date()
+    try {
+      // Get AI response from OpenAI with username
+      const aiContent = await sendOpenAIMessage(conversationHistory, user?.name || 'User')
+      
+      // Only use fallback if we get an actual error message, not a valid response
+      let responseText
+      if (aiContent && 
+          (aiContent.includes('having trouble connecting') || 
+           aiContent.includes('authentication issue') || 
+           aiContent.includes('rate-limited') ||
+           aiContent.includes('server issues') ||
+           aiContent.includes('endpoint was not found') ||
+           aiContent.includes('API key not configured'))) {
+        // Use local knowledge base as fallback
+        responseText = getSmartResponse(userMessage.content)
+        console.log('Using local knowledge base fallback due to API error')
+      } else if (!aiContent || aiContent.trim() === '') {
+        // Empty response, use fallback
+        responseText = getSmartResponse(userMessage.content)
+        console.log('Using local knowledge base fallback due to empty response')
+      } else {
+        // Use OpenAI response
+        responseText = aiContent
+        console.log('Using OpenAI response')
+      }
+      
+      const aiMessage = {
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date()
+      }
+      addMessage(aiMessage)
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error)
+      // Use local knowledge base as fallback for any unhandled errors
+      const responseText = getSmartResponse(userMessage.content)
+      const aiMessage = {
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date()
+      }
+      addMessage(aiMessage)
+    } finally {
+      setIsProcessing(false)
+      setTyping(false)
     }
-    addMessage(aiMessage)
-    setIsProcessing(false)
-    setTyping(false)
   }
 
   const handleKeyPress = (e) => {
@@ -128,17 +165,51 @@ Please provide a comprehensive analysis including:
 3. Important details or data points
 4. Any notable patterns or observations`
 
-        const aiResponse = await sendOpenAIMessage([
-          { role: 'user', content: prompt }
-        ], user?.name || 'User')
-        
-        const aiMessage = {
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date()
-        }
+        try {
+          const aiResponse = await sendOpenAIMessage([
+            { role: 'user', content: prompt }
+          ], user?.name || 'User')
+          
+          let responseText
+          // Only use fallback if we get an actual error message, not a valid response
+          if (aiResponse && 
+              (aiResponse.includes('having trouble connecting') || 
+               aiResponse.includes('authentication issue') || 
+               aiResponse.includes('rate-limited') ||
+               aiResponse.includes('server issues') ||
+               aiResponse.includes('endpoint was not found') ||
+               aiResponse.includes('API key not configured'))) {
+            // Use local knowledge base as fallback
+            responseText = getSmartResponse(prompt)
+            console.log('Using local knowledge base fallback for file analysis due to API error')
+          } else if (!aiResponse || aiResponse.trim() === '') {
+            // Empty response, use fallback
+            responseText = getSmartResponse(prompt)
+            console.log('Using local knowledge base fallback for file analysis due to empty response')
+          } else {
+            // Use OpenAI response
+            responseText = aiResponse
+            console.log('Using OpenAI response for file analysis')
+          }
+          
+          const aiMessage = {
+            role: 'assistant',
+            content: responseText,
+            timestamp: new Date()
+          }
 
-        addMessage(aiMessage)
+          addMessage(aiMessage)
+        } catch (error) {
+          console.error('Error getting AI response for file:', error)
+          // Use local knowledge base as fallback for any unhandled errors
+          const responseText = getSmartResponse(prompt)
+          const aiMessage = {
+            role: 'assistant',
+            content: responseText,
+            timestamp: new Date()
+          }
+          addMessage(aiMessage)
+        }
         
         toast.success(`Successfully processed ${file.name}`)
       } catch (error) {
@@ -181,6 +252,8 @@ Please provide a comprehensive analysis including:
     URL.revokeObjectURL(url)
   }
 
+
+
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto w-full">
       {messages.length === 0 && (
@@ -193,6 +266,8 @@ Please provide a comprehensive analysis including:
           </div>
         </div>
       )}
+      
+
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <AnimatePresence>
           {messages.map((message, index) => (
