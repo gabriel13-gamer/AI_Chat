@@ -12,7 +12,7 @@ const useChatStore = create(
         avatar: null
       },
 
-      // Separate message arrays for each chat type (do NOT persist - clear on restart)
+      // Separate message arrays for each chat type (persisted across sessions)
       aiChatMessages: [],
       liveChatMessages: [],
       codeChatMessages: [],
@@ -38,7 +38,7 @@ const useChatStore = create(
       // Documents
       documents: [],
       
-      // Chat history (do NOT persist - clear on restart)
+      // Chat history (persisted across sessions)
       chatHistory: [],
       
       // Theme - Always dark mode
@@ -129,11 +129,16 @@ const useChatStore = create(
     {
       name: 'ai-chat-storage',
       partialize: (state) => ({
-        // Only persist user data and theme - NOT chat messages or history
+        // Persist user data, chat messages, and history
         user: state.user,
         features: state.features,
         documents: state.documents,
         theme: state.theme,
+        aiChatMessages: state.aiChatMessages,
+        liveChatMessages: state.liveChatMessages,
+        codeChatMessages: state.codeChatMessages,
+        documentChatMessages: state.documentChatMessages,
+        chatHistory: state.chatHistory,
       }),
     }
   )
